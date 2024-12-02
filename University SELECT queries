@@ -1,0 +1,9 @@
+###########
+Faculty Performance Ranking: Rank faculties based on the average GPA of their students. Include the total number of students per faculty in the result.
+Expected Columns: FacultyName, AverageGPA, TotalStudents, Rank
+
+SELECT	facultyname, ROUND(AVG(gpa),2) as averagegpa, count(studentid) as totalstudents, 
+(row_number() OVER (ORDER BY AVG(gpa)DESC))
+as rank FROM Faculties
+JOIN students ON faculties.facultyid=students.facultyid
+GROUP BY facultyname
