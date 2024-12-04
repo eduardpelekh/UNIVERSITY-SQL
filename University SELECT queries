@@ -7,3 +7,153 @@ SELECT	facultyname, ROUND(AVG(gpa),2) as averagegpa, count(studentid) as totalst
 as rank FROM Faculties
 JOIN students ON faculties.facultyid=students.facultyid
 GROUP BY facultyname
+
+############
+
+Teacher Workload Analysis: For each teacher, calculate the total number of students taught across all their subjects and the average marks received by those students.
+Expected Columns: TeacherName, TotalStudents, AverageMark
+
+select CONCAT(ts.firstname,' ',ts.lastname),count(marks.studentid),round(AVG(mark),2) FROM TEACHERS ts
+JOIN subjects ss ON ts.departmentid=ss.departmentid
+JOIN marks ON marks.subjectid=ss.subjectid
+GROUP by ts.firstname,ts.lastname
+
+###################
+Subject Enrollment Report: List all subjects with the number of students enrolled and the percentage of students with marks greater than 75.
+Expected Columns: SubjectName, TotalEnrollments, HighAchieversPercentage
+
+Select ss.subjectname,COUNT(ms.studentid) AS TotalEnrollments,
+
+ROUND(100*SUM(CASE WHEN ms.mark>75 THEN 1 ELSE 0 END)/COUNT(ms.studentid),0) AS HighAchieversPercentage
+
+
+FROM subjects ss
+JOIN marks ms ON ss.subjectid=ms.subjectid
+GROUP BY ss.subjectname
+########################
+Top Department by Performance: Identify the department with the highest average GPA. Include the name of the department, its faculty, and the average GPA.
+Expected Columns: DepartmentName, FacultyName, AverageGPA
+
+SELECT ds.departmentname AS DepartmentName, fs.facultyname AS FacultyName,round(AVG(ms.mark),2) AS AverageGPA from Departments ds
+JOIN subjects ss ON ds.departmentid=ss.departmentid
+JOIN marks ms ON ms.subjectid=ss.subjectid
+JOIN faculties fs ON fs.facultyid=ds.facultyid
+GROUP BY Departmentname, fs.facultyname
+ORDER BY averagegpa DESC
+LIMIT 1
+
+#######################
+Consistent Performers: Find students who scored above 80 in all the subjects they are enrolled in.
+
+SELECT 
+    ss.StudentID, 
+    ss.FirstName, 
+    ss.LastName
+FROM 
+    Students ss
+WHERE 
+    NOT EXISTS (
+        SELECT 1 
+        FROM Marks ms
+        WHERE ms.StudentID = ss.StudentID
+        AND ms.Mark <= 80
+    );
+
+
+Explanation:
+Subquery with NOT EXISTS:
+
+The subquery checks if there are any marks for a student where the score is less than or equal to 80.
+If such a mark exists, the student is excluded from the result.
+Logic:
+
+The condition ensures that no marks for a student are below or equal to 80, meaning they scored above 80 in all subjects they are enrolled in.
+
+
+SELECT 
+    ss.StudentID, 
+    ss.FirstName, 
+    ss.LastName
+FROM 
+    Students ss
+JOIN 
+    Marks ms ON ss.StudentID = ms.StudentID
+GROUP BY 
+    ss.StudentID, ss.FirstName, ss.LastName
+HAVING 
+    MIN(ms.Mark) > 80;
+
+#############################################################
+Student Rank Within Faculty: Rank students by their GPA within each faculty. Include ties where GPAs are equal.
+Expected Columns: FacultyName, StudentID, FirstName, LastName, GPA, Rank
+
+SELECT 
+faculties.FacultyName, STUDENTS.StudentID, STUDENTS.FirstName, STUDENTS.LastName, 
+STUDENTS.GPA,
+RANK() OVER(PARTITION BY faculties.FacultyName ORDER BY GPA DESC)  AS Rank
+
+
+FROM students
+JOIN faculties ON students.facultyid=faculties.facultyid
+
+#########################################################
+Marks Distribution Report: Create a histogram of marks distribution for each subject (e.g., number of students scoring 0-50, 51-75, 76-100).
+Expected Columns: SubjectName, MarkRange, StudentCount
+
+SELECT SubjectName, 
+
+CASE
+WHEN marks.mark<50 THEN '0-50'
+WHEN marks.mark>=50 AND marks.mark<=75 THEN '51-75'
+ELSE '76-100'
+END AS MarkRange,
+
+count(marks.StudentID)
+FROM subjects
+
+JOIN marks ON subjects.subjectid=marks.subjectid
+GROUP by subjects.subjectname,MarkRange
+ORDER BY subjects.subjectname,MarkRange
+#####################################################
+Rank students within each faculty based on their GPA and list the top 5 students for each faculty.
+
+WITH ranked_students AS(
+SELECT stud.firstname,stud.lastname, fac.facultyname,
+ROW_NUMBER() OVER(PARTITION BY fac.facultyid ORDER BY stud.GPA DESC ) as cnt
+
+FROM students stud
+JOIN faculties fac ON stud.facultyid=fac.facultyid
+)
+
+SELECT firstname,lastname,facultyname,cnt AS rank from ranked_students
+WHERE cnt<6
+ORDER BY facultyname, cnt ASC
+
+#####################################################
+
+Top Performers by Subject:
+Find the top 3 students with the highest marks in each subject.
+
+
+WITH Rankedstudents AS(
+
+SELECT stu.firstname,stu.lastname, sub.subjectname,
+ROW_NUMBER() OVER(PARTITION BY sub.subjectname ORDER by ms.mark ASC) AS cnt
+
+FROM students stu
+JOIN marks ms ON stu.studentid=ms.studentid
+JOIN subjects sub ON sub.subjectid=ms.subjectid
+)
+
+SELECT firstname,lastname, subjectname from Rankedstudents
+WHERE cnt<=3
+ORDER BY subjectname,cnt DESC
+
+#############################################################
+Sort the province names in ascending order in such a way that the province 'Ontario' is always on top.
+
+SELECT province_name from province_names
+ORDER BY 
+CASE WHEN province_name='Ontario' THEN 1 ELSE 0 END
+DESC
+
